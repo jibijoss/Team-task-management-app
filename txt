@@ -1,0 +1,774 @@
+import { useState, useEffect, createContext, useContext } from "react";
+import axios from "axios";
+import { BrowserRouter, Routes, Route, Link, useNavigate } from "react-router-dom";
+import "./App.css";
+
+const API = "http://localhost:5000";
+
+/* ─────────────────────────────────────────────
+   AUTH CONTEXT
+───────────────────────────────────────────── */
+const AuthCtx = createContext(null);
+function useAuth() { return useContext(AuthCtx); }
+
+function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const login = (u) => setUser(u);
+  const logout = () => setUser(null);
+  return <AuthCtx.Provider value={{ user, login, logout }}>{children}</AuthCtx.Provider>;
+}
+
+/* ─────────────────────────────────────────────
+   MODAL
+───────────────────────────────────────────── */
+function Modal({ title, onClose, children }) {
+  return (
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <h3>{title}</h3>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   LOGIN
+───────────────────────────────────────────── */
+function Login() {
+  const navigate = useNavigate();
+  const { login } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handle = async () => {
+    setErr("");
+    setLoading(true);
+    try {
+      const res = await axios.post(`${API}/login`, { email, password });
+      login(res.data.user);
+      navigate(res.data.user.role === "admin" ? "/admin-dashboard" : "/user-dashboard");
+    } catch {
+      setErr("Invalid credentials. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="auth-wrap">
+      <div className="auth-card">
+        <h2>Welcome back</h2>
+        <p className="sub">Sign in to your workspace</p>
+
+        <div className="field">
+          <label>Email</label>
+          <input
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+
+        <div className="field">
+          <label>Password</label>
+          <input
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handle()}
+          />
+        </div>
+
+        {err && <p className="error-msg">{err}</p>}
+
+        <button className="btn btn-primary btn-full" onClick={handle} disabled={loading}>
+          {loading ? "Signing in…" : "Sign In →"}
+        </button>
+
+        <div className="divider" />
+
+        <p className="text-muted text-center">
+          No account? <Link to="/register">Register here</Link>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   REGISTER
+───────────────────────────────────────────── */
+function Register() {
+  const navigate = useNavigate();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("user");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handle = async () => {
+    setErr("");
+    setLoading(true);
+    try {
+      const res = await axios.post(`${API}/register`, { name, email, password, role });
+      alert(res.data.message);
+      navigate("/");
+    } catch {
+      setErr("Registration failed. Email may already be in use.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="auth-wrap">
+      <div className="auth-card">
+        <h2>Create account</h2>
+        <p className="sub">Join the workspace</p>
+
+        <div className="field">
+          <label>Name</label>
+          <input
+            placeholder="Your name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+
+        <div className="field">
+          <label>Email</label>
+          <input
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+
+        <div className="field">
+          <label>Password</label>
+          <input
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+
+        <div className="field">
+          <label>Role</label>
+          <select value={role} onChange={(e) => setRole(e.target.value)}>
+            <option value="user">--select--</option>
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+
+        {err && <p className="error-msg">{err}</p>}
+
+        <button className="btn btn-primary btn-full" onClick={handle} disabled={loading}>
+          {loading ? "Creating…" : "Create Account"}
+        </button>
+
+        <div className="divider" />
+
+        <p className="text-muted text-center">
+          Already registered? <Link to="/">Sign in</Link>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   SIDEBAR
+───────────────────────────────────────────── */
+function Sidebar({ activeTab, setActiveTab }) {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const navItems = [
+    { id: "overview", label: "Overview" },
+    { id: "projects", label: "Projects" },
+    { id: "tasks",    label: "My Tasks" },
+  ];
+
+  return (
+    <div className="sidebar">
+      <div className="sidebar-logo">◈ Workspace</div>
+
+      <div className="sidebar-section">Navigation</div>
+
+      {navItems.map((item) => (
+        <button
+          key={item.id}
+          className={`sidebar-item ${activeTab === item.id ? "active" : ""}`}
+          onClick={() => setActiveTab(item.id)}
+        >
+          {item.label}
+        </button>
+      ))}
+
+      <div className="sidebar-bottom">
+        <div className="user-pill">
+          <div className="avatar">{user?.name?.[0]?.toUpperCase()}</div>
+          <div>
+            <div className="user-name">{user?.name}</div>
+            <span className={`badge badge-${user?.role}`}>{user?.role}</span>
+          </div>
+        </div>
+        <button
+          className="sidebar-item logout-btn"
+          onClick={() => { logout(); navigate("/"); }}
+        >
+          ⏻ Logout
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   OVERVIEW PANEL
+───────────────────────────────────────────── */
+function OverviewPanel({ user }) {
+  const [stats, setStats] = useState({
+    projects: 0, tasks: 0, todo: 0, inProgress: 0, done: 0,
+  });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [p, t] = await Promise.all([
+          axios.get(`${API}/projects`, { params: { userId: user.id, role: user.role } }),
+          axios.get(`${API}/tasks`,    { params: { userId: user.id, role: user.role } }),
+        ]);
+        const tasks = t.data;
+        setStats({
+          projects:   p.data.length,
+          tasks:      tasks.length,
+          todo:       tasks.filter((t) => t.status === "Todo").length,
+          inProgress: tasks.filter((t) => t.status === "In Progress").length,
+          done:       tasks.filter((t) => t.status === "Done").length,
+        });
+      } catch { /* handle */ }
+    })();
+  }, []);
+
+  return (
+    <div>
+      <div className="page-header">
+        <div>
+          <div className="page-title">Overview</div>
+          <div className="page-subtitle">Hello, {user.name} — here's your workspace at a glance</div>
+        </div>
+        <span className={`badge badge-${user.role}`}>
+          {user.role === "admin" ? "👑" : "👤"} {user.role}
+        </span>
+      </div>
+
+      <div className="stats-row">
+        <div className="stat-card">
+          <div className="stat-num stat-accent">{stats.projects}</div>
+          <div className="stat-label">Projects</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-num">{stats.tasks}</div>
+          <div className="stat-label">Total Tasks</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-num stat-muted">{stats.todo}</div>
+          <div className="stat-label">To Do</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-num stat-warn">{stats.inProgress}</div>
+          <div className="stat-label">In Progress</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-num stat-success">{stats.done}</div>
+          <div className="stat-label">Done</div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-title">Your Access Level</div>
+        {user.role === "admin" ? (
+          <ul className="access-list">
+            <li>✓ Create, edit, and delete projects</li>
+            <li>✓ Assign members to projects</li>
+            <li>✓ Create, assign, and delete tasks</li>
+            <li>✓ Move any task between statuses</li>
+            <li>✓ View all users</li>
+          </ul>
+        ) : (
+          <ul className="access-list">
+            <li>✓ View projects you are a member of</li>
+            <li>✓ View tasks assigned to you</li>
+            <li>✓ Move your own tasks between statuses</li>
+            <li className="denied">✗ Cannot create or delete projects</li>
+            <li className="denied">✗ Cannot create or delete tasks</li>
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   PROJECTS PANEL
+───────────────────────────────────────────── */
+function ProjectsPanel({ user }) {
+  const isAdmin = user.role === "admin";
+  const [projects, setProjects] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({ name: "", description: "", memberIds: [] });
+
+  const fetchProjects = async () => {
+    try {
+      const res = await axios.get(`${API}/projects`, { params: { userId: user.id, role: user.role } });
+      setProjects(res.data);
+    } catch { /* handle */ }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const res = await axios.get(`${API}/users`);
+      setAllUsers(res.data);
+    } catch { /* handle */ }
+  };
+
+  useEffect(() => {
+    fetchProjects();
+    if (isAdmin) fetchUsers();
+  }, []);
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm({ name: "", description: "", memberIds: [] });
+    setShowModal(true);
+  };
+
+  const openEdit = (p) => {
+    setEditing(p);
+    setForm({ name: p.name, description: p.description, memberIds: p.memberIds || [] });
+    setShowModal(true);
+  };
+
+  const toggleMember = (id) => {
+    setForm((f) => ({
+      ...f,
+      memberIds: f.memberIds.includes(id)
+        ? f.memberIds.filter((x) => x !== id)
+        : [...f.memberIds, id],
+    }));
+  };
+
+  const save = async () => {
+    try {
+      if (editing) {
+        await axios.put(`${API}/projects/${editing._id}`, form);
+      } else {
+        await axios.post(`${API}/projects`, form);
+      }
+      setShowModal(false);
+      fetchProjects();
+    } catch {
+      alert("Failed to save project");
+    }
+  };
+
+  const del = async (id) => {
+    if (!window.confirm("Delete this project?")) return;
+    try {
+      await axios.delete(`${API}/projects/${id}`);
+      fetchProjects();
+    } catch {
+      alert("Failed to delete");
+    }
+  };
+
+  return (
+    <div>
+      <div className="page-header">
+        <div>
+          <div className="page-title">Projects</div>
+          <div className="page-subtitle">
+            {isAdmin ? "Manage all projects" : "Your assigned projects"}
+          </div>
+        </div>
+        {isAdmin && (
+          <button className="btn btn-primary" onClick={openCreate}>+ New Project</button>
+        )}
+      </div>
+
+      {projects.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-icon">◈</div>
+          <p>No projects {isAdmin ? "yet" : "assigned to you"}</p>
+        </div>
+      ) : (
+        <div className="grid grid-2">
+          {projects.map((p) => (
+            <div className="card" key={p._id}>
+              <div className="card-header">
+                <div>
+                  <div className="card-title">{p.name}</div>
+                  <div className="card-desc">{p.description}</div>
+                </div>
+                {isAdmin && (
+                  <div className="card-actions">
+                    <button className="btn btn-outline btn-sm" onClick={() => openEdit(p)}>✎</button>
+                    <button className="btn btn-danger btn-sm" onClick={() => del(p._id)}>×</button>
+                  </div>
+                )}
+              </div>
+
+              <div className="divider" />
+
+              <div className="members-label">◉ MEMBERS</div>
+              <div className="members-row">
+                {(p.memberIds || []).length === 0 ? (
+                  <span className="text-muted">No members assigned</span>
+                ) : (
+                  (p.memberIds || []).map((id) => {
+                    const u = allUsers.find((u) => u._id === id);
+                    return u ? <span className="member-chip" key={id}>{u.name}</span> : null;
+                  })
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showModal && isAdmin && (
+        <Modal title={editing ? "Edit Project" : "New Project"} onClose={() => setShowModal(false)}>
+          <div className="field">
+            <label>Project Name</label>
+            <input
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="e.g. Website Redesign"
+            />
+          </div>
+
+          <div className="field">
+            <label>Description</label>
+            <textarea
+              rows={3}
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              placeholder="What is this project about?"
+            />
+          </div>
+
+          <div className="field">
+            <label>Assign Members</label>
+            <div className="checkbox-group">
+              {allUsers.map((u) => (
+                <label className="checkbox-item" key={u._id}>
+                  <input
+                    type="checkbox"
+                    checked={form.memberIds.includes(u._id)}
+                    onChange={() => toggleMember(u._id)}
+                  />
+                  <span>{u.name}</span>
+                  <span className={`badge badge-${u.role}`}>{u.role}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="modal-footer">
+            <button className="btn btn-outline" onClick={() => setShowModal(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={save}>Save Project</button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   TASKS PANEL
+───────────────────────────────────────────── */
+const STATUS_LIST  = ["Todo", "In Progress", "Done"];
+const STATUS_BADGE = {
+  "Todo":        "badge-todo",
+  "In Progress": "badge-progress",
+  "Done":        "badge-done",
+};
+
+function TasksPanel({ user }) {
+  const isAdmin = user.role === "admin";
+  const [tasks, setTasks] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [filterProject, setFilterProject] = useState("all");
+  const [form, setForm] = useState({
+    title: "", description: "", projectId: "", assignedTo: "", status: "Todo",
+  });
+
+  const fetchAll = async () => {
+    try {
+      const [t, p, u] = await Promise.all([
+        axios.get(`${API}/tasks`,    { params: { userId: user.id, role: user.role } }),
+        axios.get(`${API}/projects`, { params: { userId: user.id, role: user.role } }),
+        isAdmin ? axios.get(`${API}/users`) : Promise.resolve({ data: [] }),
+      ]);
+      setTasks(t.data);
+      setProjects(p.data);
+      setAllUsers(u.data);
+    } catch { /* handle */ }
+  };
+
+  useEffect(() => { fetchAll(); }, []);
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm({
+      title: "", description: "",
+      projectId: projects[0]?._id || "",
+      assignedTo: "", status: "Todo",
+    });
+    setShowModal(true);
+  };
+
+  const openEdit = (t) => {
+    setEditing(t);
+    setForm({
+      title: t.title, description: t.description,
+      projectId: t.projectId, assignedTo: t.assignedTo, status: t.status,
+    });
+    setShowModal(true);
+  };
+
+  const save = async () => {
+    try {
+      if (editing) {
+        await axios.put(`${API}/tasks/${editing._id}`, form);
+      } else {
+        await axios.post(`${API}/tasks`, form);
+      }
+      setShowModal(false);
+      fetchAll();
+    } catch {
+      alert("Failed to save task");
+    }
+  };
+
+  const del = async (id) => {
+    if (!window.confirm("Delete task?")) return;
+    try {
+      await axios.delete(`${API}/tasks/${id}`);
+      fetchAll();
+    } catch {
+      alert("Failed to delete");
+    }
+  };
+
+  const updateStatus = async (taskId, status) => {
+    try {
+      await axios.patch(`${API}/tasks/${taskId}/status`, { status });
+      fetchAll();
+    } catch {
+      alert("Cannot update status");
+    }
+  };
+
+  const nextStatus        = (s) => STATUS_LIST[(STATUS_LIST.indexOf(s) + 1) % STATUS_LIST.length];
+  const filtered          = filterProject === "all" ? tasks : tasks.filter((t) => t.projectId === filterProject);
+  const byStatus          = (s) => filtered.filter((t) => t.status === s);
+  const getProjectName    = (id) => projects.find((p) => p._id === id)?.name || "—";
+  const getUserName       = (id) => allUsers.find((u) => u._id === id)?.name || (id === user.id ? user.name : "—");
+
+  return (
+    <div>
+      <div className="page-header">
+        <div>
+          <div className="page-title">Tasks</div>
+          <div className="page-subtitle">
+            {isAdmin ? "All project tasks" : "Tasks assigned to you"}
+          </div>
+        </div>
+        <div className="header-actions">
+          <select
+            className="filter-select"
+            value={filterProject}
+            onChange={(e) => setFilterProject(e.target.value)}
+          >
+            <option value="all">All Projects</option>
+            {projects.map((p) => (
+              <option key={p._id} value={p._id}>{p.name}</option>
+            ))}
+          </select>
+          {isAdmin && (
+            <button className="btn btn-primary" onClick={openCreate}>+ New Task</button>
+          )}
+        </div>
+      </div>
+
+      <div className="task-board">
+        {STATUS_LIST.map((status) => (
+          <div className="task-col" key={status}>
+            <div className="task-col-header">
+              <span className={`badge ${STATUS_BADGE[status]}`}>{status}</span>
+              <span className="task-col-count">{byStatus(status).length}</span>
+            </div>
+
+            {byStatus(status).length === 0 && (
+              <div className="task-col-empty">Empty</div>
+            )}
+
+            {byStatus(status).map((task) => {
+              const isAssigned = task.assignedTo === user.id;
+              return (
+                <div className="task-card" key={task._id}>
+                  <div className="task-card-title">{task.title}</div>
+
+                  {task.description && (
+                    <div className="task-card-desc">{task.description}</div>
+                  )}
+
+                  <div className="task-card-meta">
+                    <span>◈ {getProjectName(task.projectId)}</span>
+                    <span>◉ {getUserName(task.assignedTo)}</span>
+                  </div>
+
+                  <div className="task-actions">
+                    {(isAdmin || isAssigned) && status !== "Done" && (
+                      <button
+                        className="btn btn-outline btn-sm"
+                        onClick={() => updateStatus(task._id, nextStatus(status))}
+                      >
+                        → {nextStatus(status)}
+                      </button>
+                    )}
+                    {isAdmin && (
+                      <>
+                        <button className="btn btn-outline btn-sm" onClick={() => openEdit(task)}>✎</button>
+                        <button className="btn btn-danger btn-sm" onClick={() => del(task._id)}>×</button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+
+      {showModal && isAdmin && (
+        <Modal title={editing ? "Edit Task" : "New Task"} onClose={() => setShowModal(false)}>
+          <div className="field">
+            <label>Task Title</label>
+            <input
+              value={form.title}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              placeholder="e.g. Design landing page"
+            />
+          </div>
+
+          <div className="field">
+            <label>Description</label>
+            <textarea
+              rows={2}
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+            />
+          </div>
+
+          <div className="field">
+            <label>Project</label>
+            <select
+              value={form.projectId}
+              onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))}
+            >
+              <option value="">— Select project —</option>
+              {projects.map((p) => (
+                <option key={p._id} value={p._id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="field">
+            <label>Assign To</label>
+            <select
+              value={form.assignedTo}
+              onChange={(e) => setForm((f) => ({ ...f, assignedTo: e.target.value }))}
+            >
+              <option value="">— Select user —</option>
+              {allUsers.map((u) => (
+                <option key={u._id} value={u._id}>{u.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="field">
+            <label>Status</label>
+            <select
+              value={form.status}
+              onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+            >
+              {STATUS_LIST.map((s) => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+
+          <div className="modal-footer">
+            <button className="btn btn-outline" onClick={() => setShowModal(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={save}>Save Task</button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   DASHBOARD SHELL
+───────────────────────────────────────────── */
+function Dashboard() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [tab, setTab] = useState("overview");
+
+  useEffect(() => { if (!user) navigate("/"); }, [user]);
+  if (!user) return null;
+
+  return (
+    <div className="app-shell">
+      <Sidebar activeTab={tab} setActiveTab={setTab} />
+      <div className="main-content">
+        {tab === "overview" && <OverviewPanel user={user} />}
+        {tab === "projects" && <ProjectsPanel user={user} />}
+        {tab === "tasks"    && <TasksPanel    user={user} />}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   APP ROOT
+───────────────────────────────────────────── */
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/"                element={<Login />}    />
+          <Route path="/register"        element={<Register />} />
+          <Route path="/admin-dashboard" element={<Dashboard />} />
+          <Route path="/user-dashboard"  element={<Dashboard />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}
